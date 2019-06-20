@@ -61,7 +61,7 @@ class Servers implements \Iterator, \Countable
     public function add(string $type, string $host, int $port, ?int $timeOut = null): self
     {
         if (!in_array($type, Cache::STORES)) {
-            throw new \InvalidArgumentException('');
+            throw new \InvalidArgumentException('Invalid cache server type');
         }
 
         $server = new CacheServer();
