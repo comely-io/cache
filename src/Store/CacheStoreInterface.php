@@ -70,18 +70,4 @@ interface CacheStoreInterface
      * @return bool
      */
     public function flush(): bool;
-
-    /**
-     * @param string $key
-     * @param int $inc
-     * @return int
-     */
-    public function countUp(string $key, int $inc = 1): int;
-
-    /**
-     * @param string $key
-     * @param int $dec
-     * @return int
-     */
-    public function countDown(string $key, int $dec = 1): int;
 }
