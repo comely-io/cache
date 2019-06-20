@@ -20,6 +20,7 @@ use Comely\Cache\Exception\CacheOpException;
 use Comely\Cache\Exception\ConnectionException;
 use Comely\Cache\Store\AbstractCacheStore;
 use Comely\Cache\Store\CacheStoreInterface;
+use Comely\Cache\Store\PECL\Memcached;
 use Comely\Cache\Store\Redis;
 
 /**
@@ -85,6 +86,9 @@ class Cache implements CacheStoreInterface
                 switch ($server->type) {
                     case self::REDIS:
                         $store = new Redis($server);
+                        break;
+                    case self::MEMCACHED:
+                        $store = new Memcached($server);
                         break;
                 }
             } catch (ConnectionException $e) {
