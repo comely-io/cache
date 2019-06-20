@@ -1,0 +1,26 @@
+{
+  "name": "comely-io/cache",
+  "description": "Comely Cache Component (Redis, etc...)",
+  "type": "library",
+  "homepage": "https://github.com/comely-io/cache",
+  "license": "MIT",
+  "authors": [
+    {
+      "name": "Furqan A. Siddiqui",
+      "email": "hello@furqansiddiqui.com",
+      "homepage": "https://www.furqansiddiqui.com",
+      "role": "Author"
+    }
+  ],
+  "require": {
+    "php": "^7.1"
+  },
+  "autoload": {
+    "psr-4": {
+      "Comely\\Cache\\": [
+        "src"
+      ]
+    }
+  },
+  "minimum-stability": "dev"
+}
