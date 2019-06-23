@@ -77,10 +77,9 @@ class Cache implements CacheStoreInterface
     }
 
     /**
-     * @param bool $triggerErrors
      * @throws ConnectionException
      */
-    public function connect(bool $triggerErrors = false): void
+    public function connect(): void
     {
         if (!$this->servers->count()) {
             throw new ConnectionException('No servers in connection pool');
@@ -97,7 +96,7 @@ class Cache implements CacheStoreInterface
                         break;
                 }
             } catch (ConnectionException $e) {
-                trigger_error($e->getMessage(), $e->getCode());
+                trigger_error($e->getMessage());
             }
         }
 

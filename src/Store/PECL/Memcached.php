@@ -1,4 +1,4 @@
-<?php
+<?php /** @noinspection PhpComposerExtensionStubsInspection */
 /**
  * This file is a part of "comely-io/cache" package.
  * https://github.com/comely-io/io/cache"
