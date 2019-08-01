@@ -71,6 +71,7 @@ class Servers implements \Iterator, \Countable
         $server->timeOut = $timeOut;
 
         $this->servers[] = $server;
+        $this->count++;
         return $this;
     }
 
