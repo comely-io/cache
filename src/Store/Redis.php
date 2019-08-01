@@ -28,7 +28,7 @@ class Redis extends AbstractCacheStore
     public const ENGINE = "redis";
 
     /** @var CacheServer */
-    private $server;
+    protected $server;
     /** @var int|null */
     private $timeOut;
     /** @var null|resource */
