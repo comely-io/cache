@@ -303,7 +303,7 @@ class Cache implements CacheStoreInterface
      */
     public function checkValidKey(string $key): void
     {
-        if (!preg_match('/^[\w\-\.]$/', $key)) {
+        if (!preg_match('/^[\w\-\.]+$/', $key)) {
             throw new CacheOpException('Invalid cache item key');
         }
     }
