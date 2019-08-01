@@ -181,7 +181,7 @@ class Cache implements CacheStoreInterface
 
         $serialized = serialize(new CachedItem($key, $value, $ttl));
         $padding = self::PLAIN_STRING_MAX_LEN - strlen($serialized);
-        if ($padding) {
+        if ($padding > 0) {
             $serialized .= str_repeat("\0", $padding);
         }
 
