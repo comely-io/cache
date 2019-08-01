@@ -35,6 +35,8 @@ class CachedItem
     /** @var string|int|float|null|bool */
     public $data;
     /** @var int|null */
+    public $size;
+    /** @var int|null */
     public $ttl;
     /** @var int */
     public $timeStamp;
@@ -72,6 +74,7 @@ class CachedItem
                 throw new \UnexpectedValueException(sprintf('Cannot store value of type "%s"', $this->dataType));
         }
 
+        $this->size = is_string($this->data) ? strlen($this->data) : null;
         $this->ttl = $ttl;
         $this->timeStamp = time();
     }
