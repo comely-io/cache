@@ -30,9 +30,9 @@ use Comely\Cache\Store\Redis;
 class Cache implements CacheStoreInterface
 {
     /** string Version (Major.Minor.Release-Suffix) */
-    public const VERSION = "1.0.10";
+    public const VERSION = "1.0.20";
     /** int Version (Major * 10000 + Minor * 100 + Release) */
-    public const VERSION_ID = 10010;
+    public const VERSION_ID = 10020;
 
     public const SERIALIZED_PREFIX = "~comelyCachedItem";
     public const PLAIN_STRING_MAX_LEN = 64;
