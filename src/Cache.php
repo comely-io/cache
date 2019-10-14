@@ -30,9 +30,9 @@ use Comely\Cache\Store\Redis;
 class Cache implements CacheStoreInterface
 {
     /** string Version (Major.Minor.Release-Suffix) */
-    public const VERSION = "1.0.23";
+    public const VERSION = "1.0.24";
     /** int Version (Major * 10000 + Minor * 100 + Release) */
-    public const VERSION_ID = 10023;
+    public const VERSION_ID = 10024;
 
     public const SERIALIZED_PREFIX = "~comelyCachedItem";
     public const PLAIN_STRING_MAX_LEN = 64;
@@ -303,7 +303,7 @@ class Cache implements CacheStoreInterface
      */
     public function checkValidKey(string $key): void
     {
-        if (!preg_match('/^[\w\-\.]+$/', $key)) {
+        if (!preg_match('/^[\w\-\.\@\:\#]+$/', $key)) {
             throw new CacheOpException('Invalid cache item key');
         }
     }
