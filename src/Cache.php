@@ -17,6 +17,7 @@ namespace Comely\Cache;
 use Comely\Cache\Exception\CachedItemException;
 use Comely\Cache\Exception\CacheException;
 use Comely\Cache\Exception\RedisConnectionException;
+use Comely\Cache\Pool\ServersPool;
 use Comely\Cache\Redis\RedisClient;
 
 /**

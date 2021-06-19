@@ -12,16 +12,16 @@
 
 declare(strict_types=1);
 
-namespace Comely\Cache;
+namespace Comely\Cache\Pool;
 
+use Comely\Cache\CachedItem;
 use Comely\Cache\Exception\CachedItemException;
 use Comely\Cache\Exception\CacheException;
-use Comely\Cache\Pool\BulkCacheOp;
 use Comely\Cache\Redis\RedisClient;
 
 /**
- * Class Servers
- * @package Comely\Cache
+ * Class ServersPool
+ * @package Comely\Cache\Pool
  */
 class ServersPool
 {

@@ -26,7 +26,7 @@ class Memory
     /** @var array */
     private array $objects = [];
     /** @var int */
-    private int $count;
+    private int $count = 0;
     /** @var Cache|null */
     private ?Cache $cache = null;
     /** @var \Closure|null */
