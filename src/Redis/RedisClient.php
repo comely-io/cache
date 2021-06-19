@@ -47,10 +47,18 @@ class RedisClient
     public function __debugInfo(): array
     {
         return [
-            "redis server",
+            get_called_class(),
             $this->hostname,
             $this->port,
         ];
+    }
+
+    /**
+     * @return void
+     */
+    public function __clone(): void
+    {
+        $this->sock = null;
     }
 
     /**
