@@ -44,6 +44,18 @@ class RedisClient
     /**
      * @return array
      */
+    public function __debugInfo(): array
+    {
+        return [
+            "redis server",
+            $this->hostname,
+            $this->port,
+        ];
+    }
+
+    /**
+     * @return array
+     */
     public function __serialize(): array
     {
         return [
