@@ -1,6 +1,6 @@
 {
   "name": "comely-io/cache",
-  "description": "Comely Cache Component (Redis, Memcached, etc...)",
+  "description": "Comely Cache Component (Redis + Runtime Memory)",
   "type": "library",
   "homepage": "https://github.com/comely-io/cache",
   "license": "MIT",
@@ -13,8 +13,7 @@
     }
   ],
   "require": {
-    "php": "^7.1",
-    "comely-io/utils": "^1.1.10"
+    "php": "^8.0"
   },
   "autoload": {
     "psr-4": {
