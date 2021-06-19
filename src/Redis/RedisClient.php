@@ -1,53 +1,71 @@
 <?php
-/**
+/*
  * This file is a part of "comely-io/cache" package.
- * https://github.com/comely-io/io/cache"
+ * https://github.com/comely-io/cache
  *
  * Copyright (c) Furqan A. Siddiqui <hello@furqansiddiqui.com>
  *
  * For the full copyright and license information, please view the LICENSE
  * file that was distributed with this source code or visit following link:
- * https://github.com/comely-io/io/cache/blob/master/LICENSE
+ * https://github.com/comely-io/cache/blob/master/LICENSE
  */
 
 declare(strict_types=1);
 
-namespace Comely\Cache\Store;
+namespace Comely\Cache\Redis;
 
-use Comely\Cache\Exception\CacheException;
-use Comely\Cache\Exception\CacheOpException;
-use Comely\Cache\Exception\ConnectionException;
-use Comely\Cache\Servers\CacheServer;
+use Comely\Cache\Exception\RedisClientException;
+use Comely\Cache\Exception\RedisConnectionException;
+use Comely\Cache\Exception\RedisOpException;
 
 /**
  * Class Redis
  * @package Comely\Cache\Store
  */
-class Redis extends AbstractCacheStore
+class RedisClient
 {
-    public const ENGINE = "redis";
-
-    /** @var CacheServer */
-    protected $server;
-    /** @var int|null */
-    private $timeOut;
     /** @var null|resource */
-    private $sock;
+    private $sock = null;
 
     /**
-     * Redis constructor.
-     * @param CacheServer $server
-     * @throws ConnectionException
+     * RedisClient constructor.
+     * @param string $hostname
+     * @param int $port
+     * @param int $timeOut
      */
-    public function __construct(CacheServer $server)
+    public function __construct(
+        private string $hostname,
+        private int $port,
+        private int $timeOut = 1
+    )
     {
-        $this->timeOut = $server->timeOut ?? 1;
-        parent::__construct($server);
-        $this->connect();
     }
 
     /**
-     * @throws ConnectionException
+     * @return array
+     */
+    public function __serialize(): array
+    {
+        return [
+            "hostname" => $this->hostname,
+            "port" => $this->port,
+            "timeOut" => $this->timeOut
+        ];
+    }
+
+    /**
+     * @param array $data
+     */
+    public function __unserialize(array $data): void
+    {
+        $this->hostname = $data["hostname"];
+        $this->port = $data["port"];
+        $this->timeOut = $data["timeOut"];
+        $this->sock = null;
+    }
+
+    /**
+     * @throws RedisConnectionException
      */
     public function connect(): void
     {
@@ -55,7 +73,7 @@ class Redis extends AbstractCacheStore
         $errorNum = 0;
         $errorMsg = "";
         $socket = stream_socket_client(
-            sprintf('%s:%d', $this->server->hostname, $this->server->port),
+            sprintf('%s:%d', $this->hostname, $this->port),
             $errorNum,
             $errorMsg,
             $this->timeOut
@@ -63,7 +81,7 @@ class Redis extends AbstractCacheStore
 
         // Connected?
         if (!is_resource($socket)) {
-            throw new ConnectionException($errorMsg, $errorNum);
+            throw new RedisConnectionException($errorMsg, $errorNum);
         }
 
         $this->sock = $socket;
@@ -71,15 +89,30 @@ class Redis extends AbstractCacheStore
     }
 
     /**
+     * @return string
+     */
+    public function hostname(): string
+    {
+        return $this->hostname;
+    }
+
+    /**
+     * @return int
+     */
+    public function port(): int
+    {
+        return $this->port;
+    }
+
+    /**
      * @return void
      */
     public function disconnect(): void
     {
-        if ($this->sock) {
+        if ($this->isConnected()) {
             try {
                 $this->send("QUIT");
-            } catch (CacheException $e) {
-                trigger_error($e->getMessage(), E_USER_WARNING);
+            } catch (RedisClientException) {
             }
         }
 
@@ -106,19 +139,19 @@ class Redis extends AbstractCacheStore
 
     /**
      * @return bool
-     * @throws CacheOpException
-     * @throws ConnectionException
+     * @throws RedisConnectionException
+     * @throws RedisOpException
      */
     public function ping(): bool
     {
         // Check if connected
         if (!$this->isConnected()) {
-            throw new ConnectionException('Lost connection with server');
+            throw new RedisConnectionException('Lost connection with server');
         }
 
         $ping = $this->send("PING");
         if (!is_string($ping) || strtolower($ping) !== "pong") {
-            throw new ConnectionException('Lost connection with server');
+            throw new RedisOpException('Did not receive PONG back');
         }
 
         return true;
@@ -126,13 +159,13 @@ class Redis extends AbstractCacheStore
 
     /**
      * @param string $key
-     * @param $value
+     * @param int|string $value
      * @param int|null $ttl
      * @return bool
-     * @throws CacheOpException
-     * @throws ConnectionException
+     * @throws RedisConnectionException
+     * @throws RedisOpException
      */
-    public function set(string $key, $value, ?int $ttl = null): bool
+    public function set(string $key, int|string $value, ?int $ttl = null): bool
     {
         $query = is_int($ttl) && $ttl > 0 ?
             sprintf('SETEX %s %d "%s"', $key, $ttl, $value) :
@@ -140,7 +173,7 @@ class Redis extends AbstractCacheStore
 
         $exec = $this->send($query);
         if ($exec !== "OK") {
-            throw new CacheOpException('Failed to store data/object on REDIS server');
+            throw new RedisOpException('Failed to store data on REDIS server');
         }
 
         return true;
@@ -148,11 +181,11 @@ class Redis extends AbstractCacheStore
 
     /**
      * @param string $key
-     * @return bool|mixed
-     * @throws CacheOpException
-     * @throws ConnectionException
+     * @return int|string|bool|null
+     * @throws RedisConnectionException
+     * @throws RedisOpException
      */
-    public function get(string $key)
+    public function get(string $key): int|string|null|bool
     {
         return $this->send(sprintf('GET %s', $key));
     }
@@ -160,29 +193,29 @@ class Redis extends AbstractCacheStore
     /**
      * @param string $key
      * @return bool
-     * @throws CacheOpException
-     * @throws ConnectionException
+     * @throws RedisConnectionException
+     * @throws RedisOpException
      */
     public function has(string $key): bool
     {
-        return $this->send(sprintf('EXISTS %s', $key)) === 1 ? true : false;
+        return $this->send(sprintf('EXISTS %s', $key)) === 1;
     }
 
     /**
      * @param string $key
      * @return bool
-     * @throws CacheOpException
-     * @throws ConnectionException
+     * @throws RedisConnectionException
+     * @throws RedisOpException
      */
     public function delete(string $key): bool
     {
-        return $this->send(sprintf('DEL %s', $key)) === 1 ? true : false;
+        return $this->send(sprintf('DEL %s', $key)) === 1;
     }
 
     /**
      * @return bool
-     * @throws CacheOpException
-     * @throws ConnectionException
+     * @throws RedisConnectionException
+     * @throws RedisOpException
      */
     public function flush(): bool
     {
@@ -191,34 +224,9 @@ class Redis extends AbstractCacheStore
 
     /**
      * @param string $command
-     * @return bool|mixed
-     * @throws CacheOpException
-     * @throws ConnectionException
-     */
-    private function send(string $command)
-    {
-        if (!$this->sock) {
-            throw new ConnectionException('Not connected to any server');
-        }
-
-        $command = trim($command);
-        if (strtolower($command) == "disconnect") {
-            return @fclose($this->sock);
-        }
-
-        $write = fwrite($this->sock, $this->command($command));
-        if ($write === false) {
-            throw new CacheOpException(sprintf('Failed to send "%1$s" command', explode(" ", $command)[0]));
-        }
-
-        return $this->response();
-    }
-
-    /**
-     * @param string $command
      * @return string
      */
-    private function command(string $command): string
+    private function prepareCommand(string $command): string
     {
         $parts = str_getcsv($command, " ", '"');
         $prepared = "*" . count($parts) . "\r\n";
@@ -230,20 +238,45 @@ class Redis extends AbstractCacheStore
     }
 
     /**
-     * @return bool|int|string|null
-     * @throws CacheOpException
+     * @param string $command
+     * @return int|string|bool|null
+     * @throws RedisConnectionException
+     * @throws RedisOpException
      */
-    private function response()
+    private function send(string $command): int|string|null|bool
+    {
+        if (!$this->sock) {
+            $this->connect();
+        }
+
+        $command = trim($command);
+        if (strtolower($command) == "disconnect") {
+            return @fclose($this->sock);
+        }
+
+        $write = fwrite($this->sock, $this->prepareCommand($command));
+        if ($write === false) {
+            throw new RedisOpException(sprintf('Failed to send "%1$s" command', explode(" ", $command)[0]));
+        }
+
+        return $this->response();
+    }
+
+    /**
+     * @return int|string|null
+     * @throws RedisOpException
+     */
+    private function response(): int|string|null
     {
         // Get response from stream
         $response = fgets($this->sock);
         if (!is_string($response)) {
             $timedOut = @stream_get_meta_data($this->sock)["timed_out"] ?? null;
             if ($timedOut === true) {
-                throw new CacheOpException('Redis stream has timed out');
+                throw new RedisOpException('Redis stream has timed out');
             }
 
-            throw new CacheOpException('No response received from server');
+            throw new RedisOpException('No response received from server');
         }
 
         // Prepare response for parsing
@@ -254,8 +287,7 @@ class Redis extends AbstractCacheStore
         // Check response
         switch ($responseType) {
             case "-": // Error
-                throw new CacheOpException(substr($data, 4));
-                break;
+                throw new RedisOpException(substr($data, 4));
             case "+": // Simple String
                 return $data;
             case ":": // Integer
@@ -265,7 +297,7 @@ class Redis extends AbstractCacheStore
                 if ($bytes > 0) {
                     $data = stream_get_contents($this->sock, $bytes + 2);
                     if (!is_string($data)) {
-                        throw new CacheOpException('Failed to read REDIS bulk-string response');
+                        throw new RedisOpException('Failed to read REDIS bulk-string response');
                     }
 
                     return trim($data); // Return trimmed
@@ -274,10 +306,10 @@ class Redis extends AbstractCacheStore
                 } elseif ($bytes === -1) {
                     return null; // NULL
                 } else {
-                    throw new CacheOpException('Invalid number of REDIS response bytes');
+                    throw new RedisOpException('Invalid number of REDIS response bytes');
                 }
         }
 
-        throw new CacheOpException('Unexpected response from REDIS server');
+        throw new RedisOpException('Unexpected response from REDIS server');
     }
 }
