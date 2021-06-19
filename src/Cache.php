@@ -1,13 +1,13 @@
 <?php
-/**
+/*
  * This file is a part of "comely-io/cache" package.
- * https://github.com/comely-io/io/cache"
+ * https://github.com/comely-io/cache
  *
  * Copyright (c) Furqan A. Siddiqui <hello@furqansiddiqui.com>
  *
  * For the full copyright and license information, please view the LICENSE
  * file that was distributed with this source code or visit following link:
- * https://github.com/comely-io/io/cache/blob/master/LICENSE
+ * https://github.com/comely-io/cache/blob/master/LICENSE
  */
 
 declare(strict_types=1);
@@ -15,96 +15,91 @@ declare(strict_types=1);
 namespace Comely\Cache;
 
 use Comely\Cache\Exception\CachedItemException;
-use Comely\Cache\Exception\CachedItemExpiredException;
-use Comely\Cache\Exception\CacheOpException;
-use Comely\Cache\Exception\ConnectionException;
-use Comely\Cache\Store\AbstractCacheStore;
-use Comely\Cache\Store\CacheStoreInterface;
-use Comely\Cache\Store\PECL\Memcached;
-use Comely\Cache\Store\Redis;
+use Comely\Cache\Exception\CacheException;
+use Comely\Cache\Exception\RedisConnectionException;
+use Comely\Cache\Redis\RedisClient;
 
 /**
  * Class Cache
  * @package Comely\Cache
  */
-class Cache implements CacheStoreInterface
+class Cache
 {
     /** string Version (Major.Minor.Release-Suffix) */
-    public const VERSION = "1.0.24";
+    public const VERSION = "2.0.0";
     /** int Version (Major * 10000 + Minor * 100 + Release) */
-    public const VERSION_ID = 10024;
+    public const VERSION_ID = 20000;
 
-    public const SERIALIZED_PREFIX = "~comelyCachedItem";
-    public const PLAIN_STRING_MAX_LEN = 64;
-
-    public const REDIS = "redis";
-    public const MEMCACHED = "memcached";
-    public const STORES = [
-        "redis",
-        "memcached"
-    ];
-
-    /** @var null|CacheStoreInterface */
-    private $store;
-    /** @var Events */
-    private $events;
+    /** @var ServersPool */
+    private ServersPool $pool;
+    /** @var RedisClient|null */
+    private ?RedisClient $connected = null;
     /** @var array */
-    private $servers;
+    private array $options = [
+        "nullIfExpired" => true,
+        "deleteIfExpired" => true,
+    ];
 
     /**
      * Cache constructor.
      */
     public function __construct()
     {
-        $this->events = new Events();
-        $this->servers = new Servers($this);
+        $this->pool = new ServersPool();
     }
 
     /**
-     * @return Events
+     * @param bool|null $nullIfExpired
+     * @param bool|null $deleteIfExpired
+     * @return $this
      */
-    public function events(): Events
+    public function options(?bool $nullIfExpired = null, ?bool $deleteIfExpired = null): self
     {
-        return $this->events;
-    }
-
-    /**
-     * @return Servers
-     */
-    public function servers(): Servers
-    {
-        return $this->servers;
-    }
-
-    /**
-     * @throws ConnectionException
-     */
-    public function connect(): void
-    {
-        if (!$this->servers->count()) {
-            throw new ConnectionException('No servers in connection pool');
+        if (is_bool($nullIfExpired)) {
+            $this->options["nullIfExpired"] = $nullIfExpired;
         }
 
-        foreach ($this->servers as $server) {
+        if (is_bool($deleteIfExpired)) {
+            $this->options["deleteIfExpired"] = $deleteIfExpired;
+        }
+
+        return $this;
+    }
+
+    /**
+     * @return ServersPool
+     */
+    public function pool(): ServersPool
+    {
+        return $this->pool;
+    }
+
+    /**
+     * @param array|null $errors
+     * @throws CacheException
+     */
+    public function connect(array &$errors = null): void
+    {
+        if ($this->isConnected()) {
+            return;
+        }
+
+        $errors = [];
+        if (!$this->pool->count()) {
+            throw new CacheException('There are no servers configured');
+        }
+
+        /** @var RedisClient $server */
+        foreach ($this->pool->servers() as $server) {
             try {
-                switch ($server->type) {
-                    case self::REDIS:
-                        $store = new Redis($server);
-                        break;
-                    case self::MEMCACHED:
-                        $store = new Memcached($server);
-                        break;
-                }
-            } catch (ConnectionException $e) {
-                trigger_error($e->getMessage());
+                $server->connect();
+                $this->connected = $server;
+            } catch (RedisConnectionException $e) {
+                $errors[] = $e;
             }
         }
 
-        if (!isset($store) || !$store instanceof AbstractCacheStore) {
-            throw new ConnectionException('Failed to connect to cache server(s)');
-        }
-
-        $this->store = $store;
+        throw new CacheException('Could not connect to any server');
     }
 
     /**
@@ -112,38 +107,37 @@ class Cache implements CacheStoreInterface
      */
     public function isConnected(): bool
     {
-        if ($this->store) {
-            $connected = $this->store->isConnected();
-            if (!$connected) {
-                $this->store = null;
-            }
-
-            return $connected;
+        $connected = $this->connected?->isConnected() ?? false;
+        if (!$connected) {
+            $this->connected = null;
         }
 
-        return false;
+        return $connected;
     }
 
     /**
-     * @param bool $reconnect
-     * @return bool
-     * @throws ConnectionException
+     * @param RedisClient|null $server
+     * @return RedisClient
+     * @throws CacheException
      */
-    public function ping(bool $reconnect = false): bool
+    private function getConnectedServer(?RedisClient $server = null): RedisClient
     {
-        if ($this->store) {
-            $ping = $this->store->ping();
-            if (!$ping) {
-                $this->store = null;
-                if ($reconnect) {
-                    $this->connect();
-                }
-            }
-
-            return $ping;
+        if ($server) {
+            return $server;
         }
 
-        return false;
+        if (!$this->connected) {
+            $this->connect($errors);
+            if (!$this->connected) {
+                /** @var RedisConnectionException $error */
+                $error = $errors[0] ?? null;
+                if ($error) {
+                    throw $error;
+                }
+            }
+        }
+
+        return $this->connected;
     }
 
     /**
@@ -151,160 +145,101 @@ class Cache implements CacheStoreInterface
      */
     public function disconnect(): void
     {
-        if ($this->store) {
-            $this->store->disconnect();
-        }
-
-        $this->store = null;
+        $this->connected?->disconnect();
+        $this->connected = null;
     }
 
     /**
-     * @param string $key
-     * @param $value
-     * @param int|null $ttl
+     * @param RedisClient|null $server
      * @return bool
-     * @throws CacheOpException
+     * @throws CacheException
      */
-    public function set(string $key, $value, ?int $ttl = null): bool
+    public function ping(?RedisClient $server = null): bool
     {
-        $this->checkStoreInstance();
-        $this->checkValidKey($key);
-
-        if (is_string($value) && strlen($value) <= self::PLAIN_STRING_MAX_LEN) {
-            if ($this->store->set($key, $value, $ttl)) {
-                $this->events->onStored()->trigger([$key, "string"]);
-                return true;
-            }
-
-            return false;
-        }
-
-        $serialized = serialize(new CachedItem($key, $value, $ttl));
-        $padding = self::PLAIN_STRING_MAX_LEN - strlen($serialized);
-        if ($padding > 0) {
-            $serialized .= str_repeat("\0", $padding);
-        }
-
-        $set = $this->store->set($key, self::SERIALIZED_PREFIX . base64_encode($serialized), $ttl);
-        if ($set) {
-            $this->events->onStored()->trigger([$key, gettype($value)]);
-            return true;
-        }
-
-        return $set;
+        return $this->getConnectedServer($server)->ping();
     }
 
     /**
      * @param string $key
-     * @param bool $returnCachedItemObj
-     * @return bool|CachedItem|float|int|mixed|string|null
-     * @throws CacheOpException
-     * @throws CachedItemException
-     * @throws CachedItemExpiredException
+     * @param int|string|array|object|bool|null $value
+     * @param int|null $ttl
+     * @param RedisClient|null $server
+     * @return bool
+     * @throws CacheException
      */
-    public function get(string $key, bool $returnCachedItemObj = false)
+    public function set(string $key, int|string|null|array|object|bool $value, ?int $ttl = null, ?RedisClient $server = null): bool
     {
-        $this->checkStoreInstance();
-        $this->checkValidKey($key);
+        return $this->getConnectedServer($server)->set($key, CachedItem::Prepare($key, $value, $ttl), $ttl);
+    }
 
-        $stored = $this->store->get($key);
+    /**
+     * @param string $key
+     * @param RedisClient|null $server
+     * @return int|string|array|object|bool|null
+     * @throws CacheException
+     */
+    public function get(string $key, ?RedisClient $server = null): int|string|null|array|object|bool
+    {
+        $stored = $this->getConnectedServer($server)->get($key);
         if (!is_string($stored)) {
             return $stored;
         }
 
-        if (preg_match('/^[0-9]+$/', $stored)) {
-            return intval($stored);
+        $cachedItem = CachedItem::Decode($stored);
+        if (!$cachedItem instanceof CachedItem) {
+            return $cachedItem;
         }
 
-        $stored = trim($stored);
-        if (strlen($stored) >= self::PLAIN_STRING_MAX_LEN) {
-            $prefixLen = strlen(self::SERIALIZED_PREFIX);
-            if (substr($stored, 0, $prefixLen) === self::SERIALIZED_PREFIX) {
-                $cachedItem = unserialize(base64_decode(substr($stored, $prefixLen)));
-                if (!$cachedItem instanceof CachedItem) {
-                    throw new CachedItemException('Cannot retrieve serialized CachedItem object');
+        try {
+            return $cachedItem->getStoredItem();
+        } catch (CachedItemException $e) {
+            // Handle expired item
+            if ($e->getCode() === CachedItemException::IS_EXPIRED) {
+                if ($this->options["deleteIfExpired"]) {
+                    try {
+                        $this->delete($key);
+                    } catch (CacheException) {
+                    }
                 }
 
-                try {
-                    return $returnCachedItemObj ? $cachedItem : $cachedItem->get();
-                } catch (CachedItemExpiredException $e) {
-                    try {
-                        $this->delete($cachedItem->key);
-                    } catch (CacheOpException $e) {
-                    }
-
-                    throw $e;
+                if ($this->options["nullIfExpired"]) {
+                    return null;
                 }
             }
-        }
 
-        return $stored;
-    }
-
-    /**
-     * @param string $key
-     * @return bool
-     * @throws CacheOpException
-     */
-    public function delete(string $key): bool
-    {
-        $this->checkStoreInstance();
-        $this->checkValidKey($key);
-
-        if ($this->store->delete($key)) {
-            $this->events->onDelete()->trigger([$key]);
-            return true;
-        }
-
-        return false;
-    }
-
-    /**
-     * @return bool
-     * @throws CacheOpException
-     */
-    public function flush(): bool
-    {
-        $this->checkStoreInstance();
-        if ($this->store->flush()) {
-            $this->events->onDelete()->trigger();
-            return true;
-        }
-
-        return false;
-    }
-
-    /**
-     * @param string $key
-     * @return bool
-     * @throws CacheOpException
-     */
-    public function has(string $key): bool
-    {
-        $this->checkStoreInstance();
-        $this->checkValidKey($key);
-
-        return $this->store->has($key);
-    }
-
-    /**
-     * @throws CacheOpException
-     */
-    private function checkStoreInstance(): void
-    {
-        if (!$this->store) {
-            throw new CacheOpException('Not connected to any cache server');
+            throw $e;
         }
     }
 
     /**
      * @param string $key
-     * @throws CacheOpException
+     * @param RedisClient|null $server
+     * @return bool
+     * @throws CacheException
      */
-    public function checkValidKey(string $key): void
+    public function delete(string $key, ?RedisClient $server = null): bool
     {
-        if (!preg_match('/^[\w\-\.\@\:\#]+$/', $key)) {
-            throw new CacheOpException('Invalid cache item key');
-        }
+        return $this->getConnectedServer($server)->delete($key);
+    }
+
+    /**
+     * @param RedisClient|null $server
+     * @return bool
+     * @throws CacheException
+     */
+    public function flush(?RedisClient $server): bool
+    {
+        return $this->getConnectedServer($server)->flush();
+    }
+
+    /**
+     * @param string $key
+     * @param RedisClient|null $server
+     * @return bool
+     * @throws CacheException
+     */
+    public function has(string $key, ?RedisClient $server): bool
+    {
+        return $this->getConnectedServer($server)->has($key);
     }
 }
