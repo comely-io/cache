@@ -1,14 +1,11 @@
 # Cache
 
-Allow Comely apps to store objects and data into a caching engine
+Caching (using Redis) and runtime memory component for Comely Apps!
 
 ## Requirements
 
-* PHP >= 7.1
+* PHP **^8.0**
 
 ## Installation
 
 `composer require comely-io/cache`
-
-***
-
