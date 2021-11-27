@@ -103,6 +103,16 @@ class Memory
     }
 
     /**
+     * @param Cache $cache
+     * @return $this
+     */
+    public function useCache(Cache $cache): self
+    {
+        $this->cache = $cache;
+        return $this;
+    }
+
+    /**
      * @return void
      */
     public function flush(): void
