@@ -95,6 +95,7 @@ class Cache
             try {
                 $server->connect();
                 $this->connected = $server;
+                break;
             } catch (RedisConnectionException $e) {
                 /** @noinspection PhpArrayWriteIsNotUsedInspection */
                 $errors[] = $e;
