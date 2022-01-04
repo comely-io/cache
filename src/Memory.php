@@ -122,9 +122,9 @@ class Memory
 
     /**
      * @param MemoryQuery $query
-     * @return object|null
+     * @return mixed returns an object
      */
-    public function fetch(MemoryQuery $query): ?object
+    public function fetch(MemoryQuery $query): mixed
     {
         // Check in run-time memory
         $object = $this->objects[$query->key] ?? null;

@@ -74,9 +74,9 @@ class MemoryQuery
 
     /**
      * @param \Closure|null $callback
-     * @return object|null
+     * @return mixed returns an object
      */
-    public function fetch(?\Closure $callback = null): ?object
+    public function fetch(?\Closure $callback = null): mixed
     {
         if ($callback) {
             $this->callback($callback);
