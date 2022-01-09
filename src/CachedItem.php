@@ -56,13 +56,13 @@ class CachedItem
             return $value;
         }
 
-        $ser = self::SERIALIZED_PREFIX . serialize(new self($key, $value, $ttl));
+        $ser = serialize(new self($key, $value, $ttl));
         $padding = self::PLAIN_STRING_MAX_LEN - strlen($ser);
         if ($padding > 0) {
             $ser .= str_repeat("\0", $padding);
         }
 
-        return $ser;
+        return self::SERIALIZED_PREFIX . base64_encode($ser);
     }
 
     /**
@@ -77,7 +77,7 @@ class CachedItem
         }
 
         $byteLen = strlen($stored);
-        if ($byteLen < self::PLAIN_STRING_MAX_LEN) {
+        if ($byteLen <= self::PLAIN_STRING_MAX_LEN) {
             return $stored;
         }
 
@@ -85,8 +85,7 @@ class CachedItem
             return $stored;
         }
 
-        $stored = rtrim($stored);
-        $cachedItem = unserialize(substr($stored, self::PREFIX_LEN));
+        $cachedItem = unserialize(rtrim(base64_decode(substr($stored, self::PREFIX_LEN))));
         if (!$cachedItem instanceof self) {
             throw new CachedItemException(
                 'Could not retrieve serialized CachedItem object',
