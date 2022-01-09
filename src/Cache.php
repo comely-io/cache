@@ -27,9 +27,9 @@ use Comely\Cache\Redis\RedisClient;
 class Cache
 {
     /** string Version (Major.Minor.Release-Suffix) */
-    public const VERSION = "2.0.3";
+    public const VERSION = "2.0.4";
     /** int Version (Major * 10000 + Minor * 100 + Release) */
-    public const VERSION_ID = 20003;
+    public const VERSION_ID = 20004;
 
     /** @var ServersPool */
     private ServersPool $pool;
