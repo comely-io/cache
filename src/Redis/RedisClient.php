@@ -35,8 +35,8 @@ class RedisClient
      */
     public function __construct(
         private string $hostname,
-        private int $port,
-        private int $timeOut = 1
+        private int    $port,
+        private int    $timeOut = 1
     )
     {
     }
@@ -239,7 +239,7 @@ class RedisClient
      */
     public function flush(): bool
     {
-        return $this->send('FLUSHALL');
+        return (bool)$this->send('FLUSHALL');
     }
 
     /**
