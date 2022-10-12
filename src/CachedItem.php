@@ -30,13 +30,13 @@ class CachedItem
     public const PLAIN_STRING_MAX_LEN = 128;
 
     /** @var string */
-    public string $key;
+    public readonly string $key;
     /** @var string */
-    public string $type;
+    public readonly string $type;
     /** @var string|int|float|bool|null */
-    public string|int|float|null|bool $value;
+    public readonly string|int|float|null|bool $value;
     /** @var int */
-    public int $storedOn;
+    public readonly int $storedOn;
     /** @var int|null */
     public ?int $ttl = null;
 
@@ -72,7 +72,7 @@ class CachedItem
      */
     public static function Decode(string $stored): int|string|self
     {
-        if (preg_match('/^-?[0-9]+$/', $stored)) {
+        if (preg_match('/^-?\d+$/', $stored)) {
             return intval($stored);
         }
 

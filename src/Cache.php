@@ -27,9 +27,9 @@ use Comely\Cache\Redis\RedisClient;
 class Cache
 {
     /** string Version (Major.Minor.Release-Suffix) */
-    public const VERSION = "2.0.4";
+    public const VERSION = "2.0.5";
     /** int Version (Major * 10000 + Minor * 100 + Release) */
-    public const VERSION_ID = 20004;
+    public const VERSION_ID = 20005;
 
     /** @var ServersPool */
     private ServersPool $pool;
@@ -97,7 +97,6 @@ class Cache
                 $this->connected = $server;
                 break;
             } catch (RedisConnectionException $e) {
-                /** @noinspection PhpArrayWriteIsNotUsedInspection */
                 $errors[] = $e;
             }
         }
@@ -180,10 +179,11 @@ class Cache
     /**
      * @param string $key
      * @param RedisClient|null $server
+     * @param bool $returnRawObject
      * @return int|string|array|object|bool|null
      * @throws CacheException
      */
-    public function get(string $key, ?RedisClient $server = null): int|string|null|array|object|bool
+    public function get(string $key, ?RedisClient $server = null, bool $returnRawObject = false): int|string|null|array|object|bool
     {
         $stored = $this->getConnectedServer($server)->get($key);
         if (!is_string($stored)) {
@@ -192,6 +192,10 @@ class Cache
 
         $cachedItem = CachedItem::Decode($stored);
         if (!$cachedItem instanceof CachedItem) {
+            return $cachedItem;
+        }
+
+        if ($returnRawObject) {
             return $cachedItem;
         }
 
